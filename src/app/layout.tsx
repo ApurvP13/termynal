@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inknut_Antiqua } from "next/font/google";
+import { Geist, Geist_Mono, Inknut_Antiqua, VT323 } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+const vt = VT323({
+  variable: "--font-vt323",
+  subsets: ["latin"],
+  weight: ["400"],
 });
 
 const geistMono = Geist_Mono({
@@ -31,7 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inknut.variable} antialiased`}
+        className={`${geistSans.variable} ${vt.variable} ${geistMono.variable} ${inknut.variable} antialiased`}
       >
         {children}
       </body>
