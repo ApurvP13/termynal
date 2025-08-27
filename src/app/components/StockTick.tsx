@@ -24,11 +24,7 @@ const StockTick: React.FC<StockTickProps> = ({
 
   return (
     <div className="flex items-center gap-3">
-      <img
-        src={image}
-        alt={`logo of ${name}`}
-        className="w-12 h-12 rounded-full"
-      />
+      <img src={image} alt={`logo of ${name}`} className="w-12 h-12 " />
       <div className="flex flex-col items-start gap-0.5 font-pixel">
         <p className="text-3xl  text-white text-left uppercase">{name}</p>
 
@@ -38,7 +34,7 @@ const StockTick: React.FC<StockTickProps> = ({
               !isPositive ? "text-[#E23D3D]" : "text-[#00C853]"
             }`}
           >
-            {price}
+            {`$ ${price}`}
           </p>
           <FaSortDown
             className={`size-5 ${
