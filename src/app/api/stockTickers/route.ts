@@ -100,7 +100,9 @@ const TICKER_SYMBOLS: TickerSymbol[] = [
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-async function fetchTickerData(symbol: TickerSymbol): Promise<TickerData> {
+async function fetchTickerData(
+  symbol: TickerSymbol
+): Promise<TickerData | null> {
   try {
     const response = await fetch(
       `https://finnhub.io/api/v1/quote?symbol=${symbol.symbol}&token=${FINNHUB_API_KEY}`,
@@ -130,15 +132,7 @@ async function fetchTickerData(symbol: TickerSymbol): Promise<TickerData> {
     };
   } catch (error) {
     console.error(`Error fetching ${symbol.symbol}:`, error);
-
-    // Return fallback data if API fails
-    return {
-      ...symbol,
-      price: Math.random() * 1000 + 100,
-      change: (Math.random() - 0.5) * 20,
-      changePercent: (Math.random() - 0.5) * 10,
-      lastUpdated: new Date().toISOString(),
-    };
+    return null;
   }
 }
 
