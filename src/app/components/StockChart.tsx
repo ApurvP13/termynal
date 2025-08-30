@@ -13,7 +13,12 @@ interface FinnhubTradeMessage {
   }>;
 }
 
-const StockChart: React.FC = () => {
+interface StockChartProps {
+  selectedSymbol: string;
+  mode: "stocks" | "crypto";
+}
+
+const StockChart: React.FC<StockChartProps> = ({ selectedSymbol, mode }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chart = useRef<any>(null);
   const areaSeries = useRef<any>(null);
@@ -21,13 +26,66 @@ const StockChart: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<number>(0);
-  const selectedSymbol = "TSLA";
   const initialPriceRef = useRef<number | null>(null);
 
+  // Format symbol based on mode
+  const formatSymbolForFinnhub = (
+    symbol: string,
+    mode: "stocks" | "crypto"
+  ): string => {
+    if (mode === "crypto") {
+      // Finnhub crypto format examples:
+      // Bitcoin: BINANCE:BTCUSDT, COINBASE:BTC-USD
+      // Ethereum: BINANCE:ETHUSDT, COINBASE:ETH-USD
+      const upperSymbol = symbol.toUpperCase();
+
+      // Try to format for major exchanges
+      if (upperSymbol.includes(":")) {
+        return upperSymbol; // Already formatted (e.g., "BINANCE:BTCUSDT")
+      }
+
+      // Auto-format common symbols
+      const cryptoMappings: { [key: string]: string } = {
+        BTC: "COINBASE:BTC-USD",
+        ETH: "COINBASE:ETH-USD",
+        ADA: "COINBASE:ADA-USD",
+        SOL: "COINBASE:SOL-USD",
+        DOT: "COINBASE:DOT-USD",
+        MATIC: "COINBASE:MATIC-USD",
+        AVAX: "COINBASE:AVAX-USD",
+        LINK: "COINBASE:LINK-USD",
+        UNI: "COINBASE:UNI-USD",
+        DOGE: "COINBASE:DOGE-USD",
+        LTC: "COINBASE:LTC-USD",
+        XRP: "COINBASE:XRP-USD",
+      };
+
+      return cryptoMappings[upperSymbol] || `COINBASE:${upperSymbol}-USD`;
+    } else {
+      // Stock format is just the symbol
+      return symbol.toUpperCase();
+    }
+  };
+
+  // Get display symbol (remove exchange prefix for crypto)
+  const getDisplaySymbol = (
+    fullSymbol: string,
+    mode: "stocks" | "crypto"
+  ): string => {
+    if (mode === "crypto" && fullSymbol.includes(":")) {
+      const parts = fullSymbol.split(":");
+      if (parts.length > 1) {
+        // Convert COINBASE:BTC-USD to BTC
+        return parts[1].split("-")[0];
+      }
+    }
+    return fullSymbol;
+  };
+
+  // Initialize chart
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Create the chart
     const chartOptions = {
       width: 984,
       height: 565,
@@ -47,14 +105,12 @@ const StockChart: React.FC = () => {
 
     chart.current = createChart(chartContainerRef.current, chartOptions);
 
-    // Create area series (instead of line)
     areaSeries.current = chart.current.addSeries(AreaSeries, {
       lineColor: "#00C853",
       topColor: "rgba(0, 200, 83, 0.5)",
       bottomColor: "rgba(255, 255, 255, 0)",
     });
 
-    // Handle window resize
     const handleResize = () => {
       if (chart.current) {
         chart.current.applyOptions({
@@ -74,11 +130,35 @@ const StockChart: React.FC = () => {
     };
   }, []);
 
+  // WebSocket connection and symbol subscription
   useEffect(() => {
-    // Initialize WebSocket connection
+    // Clean up previous connection
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    // Reset states for new symbol
+    setCurrentPrice(null);
+    setPriceChange(0);
+    initialPriceRef.current = null;
+
+    // Clear chart data
+    if (areaSeries.current) {
+      areaSeries.current.setData([]);
+    }
+
+    // Don't connect if no symbol is selected
+    if (!selectedSymbol) return;
+
     const initWebSocket = () => {
       try {
         const API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+
+        if (!API_KEY) {
+          console.error("Finnhub API key is not configured");
+          return;
+        }
+
         const ws = new WebSocket(`wss://ws.finnhub.io?token=${API_KEY}`);
         wsRef.current = ws;
 
@@ -96,48 +176,61 @@ const StockChart: React.FC = () => {
           console.log("WebSocket connection opened");
           setIsConnected(true);
 
-          // Subscribe to AAPL trades
+          // Format symbol for Finnhub based on mode
+          const formattedSymbol = formatSymbolForFinnhub(selectedSymbol, mode);
+
+          // Subscribe to symbol trades
           ws.send(
             JSON.stringify({
               type: "subscribe",
-              symbol: selectedSymbol,
+              symbol: formattedSymbol,
             })
           );
 
-          console.log(`Subscribed to ${selectedSymbol} trades`);
+          console.log(`Subscribed to ${formattedSymbol} trades (${mode} mode)`);
         };
 
         ws.onmessage = (event) => {
           try {
+            console.log("Raw WebSocket message:", event.data); // Debug log
             const message: FinnhubTradeMessage = JSON.parse(event.data);
+            console.log("Parsed message:", message); // Debug log
 
             if (
               message.type === "trade" &&
               message.data &&
               areaSeries.current
             ) {
-              // Process each trade
+              const formattedSymbol = formatSymbolForFinnhub(
+                selectedSymbol,
+                mode
+              );
+
+              console.log(
+                "Looking for symbol:",
+                formattedSymbol,
+                "in trades:",
+                message.data
+              ); // Debug log
+
               message.data.forEach((trade) => {
-                if (trade.s === selectedSymbol) {
+                if (trade.s === formattedSymbol) {
                   const tradeData = {
-                    time: Math.floor(trade.t / 1000), // Convert ms to seconds
-                    value: trade.p, // Current price
+                    time: Math.floor(trade.t / 1000),
+                    value: trade.p,
                   };
 
-                  // Update the chart
                   areaSeries.current.update(tradeData);
 
-                  // Set initial price reference
                   if (initialPriceRef.current === null) {
                     initialPriceRef.current = trade.p;
                   }
 
-                  // Update current price and calculate change
                   setCurrentPrice(trade.p);
                   const change = trade.p - (initialPriceRef.current || trade.p);
                   setPriceChange(change);
 
-                  // Update area colors based on price change
+                  // Update colors based on price change
                   const lineColor = change >= 0 ? "#00C853" : "#fd372e";
                   const topColor =
                     change >= 0
@@ -151,7 +244,7 @@ const StockChart: React.FC = () => {
                   });
 
                   console.log(
-                    `${selectedSymbol}: $${trade.p} at ${new Date(
+                    `${formattedSymbol}: $${trade.p} at ${new Date(
                       trade.t
                     ).toLocaleTimeString()}`
                   );
@@ -174,78 +267,106 @@ const StockChart: React.FC = () => {
         wsRef.current.close();
       }
     };
-  }, []);
+  }, [selectedSymbol, mode]);
 
-  const now = new Date();
+  const formatDateTime = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+    });
+    const timeStr = now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    });
+    return { dateStr, timeStr };
+  };
 
-  const dateStr = now.toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "short",
-  });
+  const { dateStr, timeStr } = formatDateTime();
+  const displaySymbol = getDisplaySymbol(selectedSymbol, mode);
 
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZoneName: "short",
-  });
+  if (!selectedSymbol) {
+    return (
+      <div className="w-full flex items-center justify-center h-96">
+        <p className="text-gray-400 text-lg">
+          Search for a {mode === "stocks" ? "stock" : "crypto"} symbol to view
+          the chart
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full flex flex-col items-start gap-2 p-4">
-      <div className="flex font-mono flex-col gap-1.5 items-start">
+    <div className="w-full flex flex-col items-start gap-4 p-4">
+      {/* Header Info */}
+      <div className="flex font-mono flex-col gap-2 items-start">
+        <div className="flex items-center gap-4">
+          {/* Connection Status */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-3 h-3 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
+            ></span>
+            <span className="text-sm text-gray-400">
+              {isConnected ? "Connected" : "Connecting..."}
+            </span>
+          </div>
+
+          {/* Mode Badge */}
+          <div className="px-2 py-1 bg-gray-800 rounded text-xs text-gray-300 uppercase">
+            {mode}
+          </div>
+
+          {/* API Source */}
+          <div className="px-2 py-1 bg-blue-900/30 rounded text-xs text-blue-300">
+            Finnhub
+          </div>
+
+          {/* Exchange Info for Crypto */}
+          {mode === "crypto" && (
+            <div className="px-2 py-1 bg-purple-900/30 rounded text-xs text-purple-300">
+              Coinbase
+            </div>
+          )}
+        </div>
+
+        {/* Price Display */}
         {currentPrice && (
-          <div className="flex gap-3 items-center justify-between">
+          <div className="flex gap-3 items-center">
             <div className="text-3xl text-white">
               <span className="text-lg">$</span>
-              {currentPrice}
+              {currentPrice.toFixed(mode === "crypto" ? 6 : 2)}
             </div>
             <span
-              className={`text-sm ${
+              className={`text-sm font-medium ${
                 priceChange >= 0 ? "text-green-400" : "text-red-400"
               }`}
             >
               {priceChange >= 0 ? "+" : ""}
-              {priceChange.toFixed(2)}
+              {priceChange.toFixed(mode === "crypto" ? 6 : 2)}
             </span>
           </div>
         )}
-        <div className="font-sm font-mono text-center">
-          <span className="text-gray-400">{selectedSymbol} | </span>
-          <span className="text-green-400">{`${dateStr} | ${timeStr}`}</span>
-        </div>
-      </div>
-      {/* <div className="mb-4 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-3 h-3 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></span>
-          <span className="text-sm">
-            {isConnected ? `Connected` : "Disconnected"}
+
+        {/* Symbol and Time */}
+        <div className="text-sm font-mono">
+          <span className="text-gray-400 font-bold">
+            {displaySymbol.toUpperCase()}
+          </span>
+          <span className="text-gray-500"> | </span>
+          <span className="text-green-400">
+            {dateStr} | {timeStr}
           </span>
         </div>
+      </div>
 
-        {currentPrice && (
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold">
-              ${currentPrice.toFixed(2)}
-            </span>
-            <span
-              className={`text-sm ${
-                priceChange >= 0 ? "text-green-500" : "text-red-500"
-              }`}
-            >
-              {priceChange >= 0 ? "+" : ""}
-              {priceChange.toFixed(2)}
-            </span>
-          </div>
-        )}
-      </div> */}
-
+      {/* Chart */}
       <div
         ref={chartContainerRef}
-        className="border rounded"
+        className="border border-gray-700 rounded-lg bg-gray-900/50"
         style={{ width: "984px", height: "565px" }}
       />
     </div>
