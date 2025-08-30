@@ -28,31 +28,31 @@ const NavBar: React.FC<NavBarProps> = ({
   };
 
   return (
-    <nav className="w-full bg-gray-900 border-b border-gray-800 px-6 py-4">
+    <nav className="w-full  px-6 py-4">
       <div className="flex items-center justify-between">
         {/* Logo */}
-        <div className="text-2xl font-bold text-white">
-          Term<span className="text-green-400">Y</span>nal
+        <div className="text-2xl font-medium font-mono text-white">
+          Term<span className="text-green-400 font-logo">Y</span>nal
         </div>
 
         {/* Center Toggle */}
-        <div className="flex items-center bg-gray-800 rounded-lg p-1">
+        <div className="flex gap-3 font-sans items-center bg-white/10 rounded-[40px] p-2.5">
           <button
             onClick={() => handleModeToggle("stocks")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-2.5 rounded-[40px] text-sm font-medium transition-all ${
               selectedMode === "stocks"
-                ? "bg-green-500 text-white"
-                : "text-gray-400 hover:text-white"
+                ? "underline decoration-1 decoration-[#6BE95F]"
+                : "text-[#999999] hover:text-white"
             }`}
           >
             Stocks
           </button>
           <button
             onClick={() => handleModeToggle("crypto")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={` px-4 py-2.5 rounded-[40px] text-sm font-medium transition-all ${
               selectedMode === "crypto"
-                ? "bg-green-500 text-white"
-                : "text-gray-400 hover:text-white"
+                ? "underline decoration-1 decoration-[#6BE95F] underline-offset-2"
+                : "text-[#999999] hover:text-white"
             }`}
           >
             Crypto
@@ -62,13 +62,13 @@ const NavBar: React.FC<NavBarProps> = ({
         {/* Search */}
         <form onSubmit={handleSearch} className="relative">
           <div className="flex items-center">
-            <Search className="absolute left-3 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 w-4 h-4 text-white" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search Anything"
-              className="bg-gray-800 text-white placeholder-gray-400 pl-10 pr-4 py-2 rounded-lg border border-gray-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 w-64"
+              className="bg-white/10 font-mono text-white placeholder-white/30 pl-10 pr-4 py-2 rounded-[20px]  focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 w-64"
             />
           </div>
         </form>
